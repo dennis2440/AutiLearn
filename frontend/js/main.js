@@ -15,7 +15,7 @@ const bars = () => ["match", "spell", "trace"].map(m => {
   return `<div class="bar"><i style="width:${p}%"></i><span>${m}</span><b>${p}%</b></div>`;
 }).join("");
 
-const TITLE = { login: "Welcome", guardian: "Guardian", tutor: "Tutor", play: "" };
+const TITLE = { login: "AutiLearn", guardian: "Parent / Guardian", tutor: "Teacher Portal", play: "" };
 const ALLOW = { guardian: "guardian", play: "guardian", tutor: "tutor" }; // view -> required role
 
 function go(v, arg) {
@@ -28,6 +28,7 @@ function go(v, arg) {
   }
   app.onclick = null; app.innerHTML = "";
   title.textContent = TITLE[v];
+  const stars = $("#stars"); if (stars) stars.textContent = `⭐ ${Store.s.tokens || 0}`;
   $("#bar").hidden = v === "login" || v === "play";
   Views[v](app, arg);
 }
