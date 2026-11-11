@@ -7,10 +7,18 @@
   <link rel="stylesheet" href="css/base.css" />
 </head>
 <body>
-  <main id="app"><h1>AutiLearn</h1><p id="status">Checking server&hellip;</p></main>
-
+  <header id="bar"><button id="back" hidden aria-label="Back">&larr;</button><h1 id="title">AutiLearn</h1><span id="stars">⭐ 0</span></header>
+  <main id="app"></main>
+  <div id="toast" role="status"></div>
   <script src="js/core/config.js"></script>
   <script src="js/core/api.js"></script>
+  <script src="js/core/store.js"></script>
+  <script src="js/core/tts.js"></script>
+  <script src="js/child/match.js"></script>
+  <script src="js/child/spell.js"></script>
+  <script src="js/child/trace.js"></script>
+  <script src="js/guardian/guardian.js"></script>
+  <script src="js/tutor/tutor.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
