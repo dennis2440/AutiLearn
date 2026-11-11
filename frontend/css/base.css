@@ -1,0 +1,6 @@
+/* Calm, high-contrast, mobile-first base. Shared tokens here; per-view styles in css/<view>.css */
+:root { --bg:#f7f9fc; --text:#1b2430; --accent:#2e5597; --radius:16px; }
+* { box-sizing: border-box; }
+html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family: system-ui, sans-serif; }
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+#app { padding: 1rem; max-width: 720px; margin: 0 auto; }
