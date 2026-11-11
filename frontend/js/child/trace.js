@@ -1,33 +1,83 @@
+// Shapes are stroke paths (0-1 coords): they draw the guide, define the hitbox mask AND drive the tutorial animation.
+const PATHS = {
+  I: [[[.5,.15],[.5,.85]]], L: [[[.3,.15],[.3,.85],[.7,.85]]], T: [[[.2,.15],[.8,.15]],[[.5,.15],[.5,.85]]],
+  V: [[[.25,.15],[.5,.85],[.75,.15]]], 1: [[[.35,.3],[.55,.15],[.55,.85]]], 7: [[[.25,.15],[.75,.15],[.4,.85]]],
+  O: [Array.from({ length: 25 }, (_, i) => [.5 + .32 * Math.cos(i / 24 * 6.2832 - 1.5708), .5 + .32 * Math.sin(i / 24 * 6.2832 - 1.5708)])],
+  A: [[[.2,.85],[.5,.15],[.8,.85]],[[.32,.6],[.68,.6]]], H: [[[.28,.15],[.28,.85]],[[.72,.15],[.72,.85]],[[.28,.5],[.72,.5]]],
+  E: [[[.72,.15],[.3,.15],[.3,.85],[.72,.85]],[[.3,.5],[.65,.5]]], Z: [[[.25,.15],[.75,.15],[.25,.85],[.75,.85]]],
+  "□": [[[.25,.25],[.75,.25],[.75,.75],[.25,.75],[.25,.25]]], "△": [[[.5,.2],[.8,.8],[.2,.8],[.5,.2]]],
+};
+const BASIC = ["I","L","T","V","O","1","7"], EXTRA = ["A","H","E","Z","□","△"];
+
 Views.trace = (el) => {
-  const g = pick(("ABCDEFHILOTUV123456789" + (Store.has("trace") ? "JKMNPQRSWXYZ" : "")).split(""));
-  const S = Math.min(el.clientWidth - 32, 380);
-  el.innerHTML = `<p class="q">Trace: <b>${g}</b></p>
-    <div class="cv" style="width:${S}px;height:${S}px"><canvas id="g" width="${S}" height="${S}"></canvas><canvas id="d" width="${S}" height="${S}"></canvas></div>
-    <div class="row sp"><button class="ghost" id="clr">Clear</button><button class="card ok" id="done" style="min-height:56px">Done ✔</button></div>`;
-  const G = el.querySelector("#g"), D = el.querySelector("#d"), gc = G.getContext("2d"), c = D.getContext("2d");
-  gc.font = `bold ${S * 0.8}px Arial`; gc.textAlign = "center"; gc.textBaseline = "middle"; gc.fillStyle = "#cfd8e8";
-  gc.fillText(g, S / 2, S * 0.53);
-  c.lineWidth = S / 9; c.lineCap = c.lineJoin = "round"; c.strokeStyle = "#2e5597";
-  let on = false;
-  const pt = (e, start) => {
-    const r = D.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-    if (start) { c.beginPath(); c.moveTo(x, y); }
-    c.lineTo(x + 0.1, y); c.stroke();
+  const d = Store.s.difficulty, S = Math.max(220, Math.min(el.clientWidth - 32, innerHeight - 240, 380));
+  const pool = BASIC.concat(Store.has("trace") ? EXTRA : []);
+  el.innerHTML = `<p class="q" id="tq"></p><div class="cv" style="width:${S}px;height:${S}px">
+    <canvas id="g" width="${S}" height="${S}"></canvas><canvas id="d" width="${S}" height="${S}"></canvas><i class="hand" hidden>👆</i></div>
+    <div class="row"><button class="ghost" id="clr">Clear</button></div>`;
+  const q = (s) => el.querySelector(s), G = q("#g"), D = q("#d"), hand = q(".hand"), gc = G.getContext("2d"), c = D.getContext("2d");
+  const W = S * (0.14 - 0.02 * d); // guide width: narrower = stricter on harder levels
+  let t = { g: pick(pool), ok: 0 }, mask, pts = [], busy = false, on = false, timer;
+  const inShape = (x, y) => x >= 0 && y >= 0 && x < S && y < S && mask[((y | 0) * S + (x | 0)) * 4 + 3] > 40;
+  const seg = (a, b, col) => { c.strokeStyle = col; c.lineWidth = S / 16; c.lineCap = "round"; c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke(); };
+  const frame = () => new Promise(r => requestAnimationFrame(r));
+
+  const start = () => {  // memory mode after 2 successful guided traces: guide hidden (mask still used for grading)
+    const mem = t.ok >= 2;
+    pts = []; busy = false; c.clearRect(0, 0, S, S); gc.clearRect(0, 0, S, S);
+    gc.strokeStyle = "#cfd8e8"; gc.lineWidth = W; gc.lineCap = gc.lineJoin = "round";
+    PATHS[t.g].forEach(st => { gc.beginPath(); st.forEach(([x, y], i) => i ? gc.lineTo(x * S, y * S) : gc.moveTo(x * S, y * S)); gc.stroke(); });
+    mask = gc.getImageData(0, 0, S, S).data;
+    G.style.opacity = mem ? 0 : 1;
+    if (!mem) { const [x, y] = PATHS[t.g][0][0]; c.fillStyle = "#3f8f6b"; c.beginPath(); c.arc(x * S, y * S, W * 0.4, 0, 7); c.fill(); } // start dot
+    q("#tq").innerHTML = mem ? `Draw <b>${t.g}</b> from memory 🧠` : `Trace: <b>${t.g}</b>`;
   };
-  D.onpointerdown = (e) => { on = true; D.setPointerCapture(e.pointerId); pt(e, true); };
-  D.onpointermove = (e) => on && pt(e);
-  D.onpointerup = D.onpointercancel = () => (on = false);
-  el.querySelector("#clr").onclick = () => c.clearRect(0, 0, S, S);
-  el.querySelector("#done").onclick = () => {
-    const gd = gc.getImageData(0, 0, S, S).data, dd = c.getImageData(0, 0, S, S).data;
-    let total = 0, hit = 0, drawn = 0;
-    for (let i = 3; i < gd.length; i += 4) {
-      if (dd[i] > 0) drawn++;
-      if (gd[i] > 128) { total++; if (dd[i] > 0) hit++; }
+
+  const demo = async () => {  // guided correction: a hand traces the shape correctly
+    c.clearRect(0, 0, S, S); G.style.opacity = 1; hand.hidden = false;
+    c.strokeStyle = "#3f8f6b"; c.lineWidth = S / 16; c.lineCap = "round";
+    for (const st of PATHS[t.g]) {
+      let px = st[0][0] * S, py = st[0][1] * S;
+      for (let i = 1; i < st.length; i++) {
+        const [x0, y0] = st[i - 1], [x1, y1] = st[i], n = Math.ceil(Math.hypot((x1 - x0) * S, (y1 - y0) * S) / 5);
+        for (let k = 1; k <= n; k++) {
+          if (!el.isConnected) return;
+          const x = (x0 + (x1 - x0) * k / n) * S, y = (y0 + (y1 - y0) * k / n) * S;
+          c.beginPath(); c.moveTo(px, py); c.lineTo(x, y); c.stroke(); px = x; py = y;
+          hand.style.transform = `translate(${x}px,${y}px)`; await frame();
+        }
+      }
     }
-    const ok = hit / total >= 0.4 + 0.1 * Store.s.difficulty && drawn <= total * 4; // covers the shape, not a scribble
-    Store.record("trace", ok);
-    if (ok) { win(); setTimeout(() => Views.trace(el), 1300); }
-    else { Tts.speak("Try again"); toast("Follow the grey shape"); c.clearRect(0, 0, S, S); }
+    hand.hidden = true; await sleep(700);
   };
+
+  const grade = async () => {  // runs automatically ~1s after the last stroke
+    if (pts.length < 12 || busy) return;
+    busy = true;
+    const acc = pts.filter(p => inShape(p.x, p.y)).length / pts.length, cells = [];
+    for (let y = 0; y < S; y += 6) for (let x = 0; x < S; x += 6) if (inShape(x, y)) cells.push([x, y, pts.some(p => Math.abs(p.x - x) < S * .06 && Math.abs(p.y - y) < S * .06)]);
+    const cov = cells.filter(k => k[2]).length / cells.length;
+    const ok = acc >= 0.75 + 0.05 * d && cov >= 0.65 + 0.05 * d; // grey area outside the shape = wrong
+    c.clearRect(0, 0, S, S); G.style.opacity = 1;
+    c.fillStyle = "rgba(224,160,48,.45)"; cells.filter(k => !k[2]).forEach(k => c.fillRect(k[0] - 3, k[1] - 3, 6, 6)); // missed parts
+    for (let i = 1; i < pts.length; i++) if (!pts[i].b) seg(pts[i - 1], pts[i], inShape(pts[i].x, pts[i].y) ? "#3f8f6b" : "#e0a030"); // green = on path, amber = off
+    Store.record("trace", ok);
+    if (ok) win(); else Fx.bad();
+    await sleep(1600); if (!el.isConnected) return;
+    if (ok) t = t.ok >= 2 ? { g: pick(pool.filter(x => x !== t.g)), ok: 0 } : { g: t.g, ok: t.ok + 1 };
+    else { await demo(); if (!el.isConnected) return; if (t.ok >= 2) t.ok = 1; } // progression blocked: same shape again
+    start();
+  };
+
+  const xy = (e) => { const r = D.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  D.onpointerdown = (e) => { if (busy) return; clearTimeout(timer); on = true; D.setPointerCapture(e.pointerId); const p = { ...xy(e), b: 1 }; pts.push(p); seg(p, p, "#2e5597"); };
+  D.onpointermove = (e) => {
+    if (!on) return;
+    const { x, y } = xy(e), p = pts[pts.length - 1], n0 = pts.length, n = Math.ceil(Math.hypot(x - p.x, y - p.y) / 4);
+    for (let i = 1; i <= n; i++) pts.push({ x: p.x + (x - p.x) * i / n, y: p.y + (y - p.y) * i / n });
+    for (let i = n0; i < pts.length; i++) seg(pts[i - 1], pts[i], "#2e5597");
+  };
+  D.onpointerup = D.onpointercancel = () => { if (on) { on = false; timer = setTimeout(grade, 1000); } };
+  q("#clr").onclick = () => { if (!busy) { clearTimeout(timer); start(); } };
+  start();
 };

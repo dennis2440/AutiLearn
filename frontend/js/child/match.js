@@ -10,9 +10,14 @@ Views.match = (el) => {
     el.onclick = (e) => {
       if (e.target.id === "say") return Tts.speak("Find " + ans[1]);
       const b = e.target.closest("[data-k]");
-      if (!b) return;
-      if (b.dataset.k === ans[1]) { Store.record("match", true); win(); setTimeout(round, 1300); }
-      else { Store.record("match", false); b.classList.add("soft"); Tts.speak("Try again"); }
+      if (!b || b.classList.contains("soft")) return;
+      if (b.dataset.k === ans[1]) {
+        el.onclick = null; Store.record("match", true); win(b);
+        setTimeout(() => el.isConnected && round(), 1800);
+      } else {
+        Store.record("match", false); Fx.bad(b);
+        setTimeout(() => b.classList.add("soft"), 900); // gently fades the wrong choice
+      }
     };
   };
   round();
