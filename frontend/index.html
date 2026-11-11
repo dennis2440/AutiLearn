@@ -7,16 +7,22 @@
   <link rel="stylesheet" href="css/base.css" />
 </head>
 <body>
-  <header id="bar"><button id="back" hidden aria-label="Back">&larr;</button><h1 id="title">AutiLearn</h1><span id="stars">⭐ 0</span></header>
+  <header id="bar"><h1 id="title">AutiLearn</h1><span id="stars">⭐ 0</span><button id="out" class="ghost">Log out</button></header>
   <main id="app"></main>
+  <div id="msg" role="status" aria-live="polite"></div>
   <div id="toast" role="status"></div>
+  <canvas id="fx" aria-hidden="true"></canvas>
   <script src="js/core/config.js"></script>
   <script src="js/core/api.js"></script>
   <script src="js/core/store.js"></script>
   <script src="js/core/tts.js"></script>
+  <script src="js/core/fx.js"></script>
+  <script src="js/core/native.js"></script>
+  <script src="js/auth/login.js"></script>
   <script src="js/child/match.js"></script>
   <script src="js/child/spell.js"></script>
   <script src="js/child/trace.js"></script>
+  <script src="js/child/play.js"></script>
   <script src="js/guardian/guardian.js"></script>
   <script src="js/tutor/tutor.js"></script>
   <script src="js/main.js"></script>
