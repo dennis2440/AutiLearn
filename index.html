@@ -3,14 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>AutiLearn</title>
+  <meta name="theme-color" content="#0877dc" />
+  <meta name="description" content="AutiLearn — calm, playful learning activities for every child." />
+  <title>AutiLearn | Learn and Play</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/base.css" />
 </head>
 <body>
-  <header id="bar"><h1 id="title">AutiLearn</h1><span id="stars">⭐ 0</span><button id="out" class="ghost">Log out</button></header>
-  <main id="app"></main>
+  <header id="bar"><h1 id="title">AutiLearn</h1><span id="stars" aria-label="AutiTokens">⭐ 0</span><button id="out" class="ghost" type="button">Log out</button></header>
+  <main id="app" aria-live="polite"></main>
   <div id="msg" role="status" aria-live="polite"></div>
-  <div id="toast" role="status"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
   <canvas id="fx" aria-hidden="true"></canvas>
   <script src="js/core/config.js"></script>
   <script src="js/core/api.js"></script>
