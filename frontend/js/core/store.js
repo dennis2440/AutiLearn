@@ -2,7 +2,7 @@
 const Views = {};
 const Store = (() => {
   const K = "autilearn_state";
-  const def = { difficulty: 1, tokens: 20.0, maxTokens: 100.0, stars: 0, stats: { match: [0, 0], spell: [0, 0], trace: [0, 0] }, scores: { match: [], spell: [], trace: [] }, log: [], notes: [], unlocked: [] };
+  const def = { difficulty: 1, tokens: 20.0, maxTokens: 100.0, stars: 0, stats: { match: [0, 0], spell: [0, 0], trace: [0, 0] }, scores: { match: [], spell: [], trace: [] }, log: [], notes: [], unlocked: [], mute: false, voice: "default" };
   let s;
   try { s = { ...def, ...JSON.parse(localStorage.getItem(K)) }; } catch { s = { ...def }; }
   const save = () => {
