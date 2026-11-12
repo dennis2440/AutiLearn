@@ -15,8 +15,8 @@ const bars = () => ["match", "spell", "trace"].map(m => {
   return `<div class="bar"><i style="width:${p}%"></i><span>${m}</span><b>${p}%</b></div>`;
 }).join("");
 
-const TITLE = { login: "AutiLearn", guardian: "Parent / Guardian", tutor: "Teacher Portal", play: "" };
-const ALLOW = { guardian: "guardian", play: "guardian", tutor: "tutor" };
+const TITLE = { login: "AutiLearn", guardian: "Parent / Guardian", tutor: "Teacher Portal", assessment: "IQ Assessment", play: "" };
+const ALLOW = { guardian: "guardian", assessment: "guardian", play: "guardian", tutor: "tutor" };
 
 function go(v, arg) {
   try { speechSynthesis.cancel(); } catch {}

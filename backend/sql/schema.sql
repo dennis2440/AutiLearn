@@ -24,11 +24,24 @@ CREATE TABLE IF NOT EXISTS child (
     full_name VARCHAR(120) NOT NULL,
     age TINYINT UNSIGNED NOT NULL,
     learning_level ENUM('beginner','intermediate','advanced') NOT NULL DEFAULT 'beginner',
+    iq_score INT NULL,
+    iq_assessed_at TIMESTAMP NULL,
+    iq_override_level ENUM('beginner','intermediate','advanced') NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_child_parent FOREIGN KEY (parent_id) REFERENCES parent(id) ON DELETE CASCADE,
     CONSTRAINT fk_child_tutor FOREIGN KEY (tutor_id) REFERENCES tutor(id) ON DELETE SET NULL,
     INDEX idx_child_parent (parent_id),
     INDEX idx_child_tutor (tutor_id)
+);
+
+CREATE TABLE IF NOT EXISTS iq_assessment (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    child_id INT NOT NULL,
+    iq_score INT NOT NULL,
+    answers TEXT NOT NULL,
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_assessment_child FOREIGN KEY (child_id) REFERENCES child(id) ON DELETE CASCADE,
+    INDEX idx_assessment_child (child_id)
 );
 
 CREATE TABLE IF NOT EXISTS history (

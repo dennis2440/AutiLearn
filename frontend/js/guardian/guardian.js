@@ -7,25 +7,41 @@ Views.guardian = async (el) => {
   const s = Store.s;
   let children = [];
   let summary = { children_count: 0, activities_completed: 0, average_score: 0 };
+  let childAssessments = {}; // Track which children need assessment
+  const COST_PER_LEARNER = 5; // Cost in tokens to add new learner
   
-  // Fetch children from backend
+  // Show loading state immediately
+  el.innerHTML = `<section class="dashboard-intro"><h2>Loading your dashboard... 👋</h2></section>`;
+  
+  // Fetch children and summary in parallel
   try {
-    const response = await Api.get("/api/parent/children");
-    children = response.children || [];
+    const [childrenResp, summaryResp] = await Promise.all([
+      Api.get("/api/parent/children").catch(() => ({ children: [] })),
+      Api.get("/api/parent/summary").catch(() => ({ summary: { children_count: 0, activities_completed: 0, average_score: 0 } }))
+    ]);
+    
+    children = childrenResp.children || [];
+    summary = summaryResp.summary || summary;
     childrenList = children;
     console.log("Fetched children from API:", children);
+    
+    // Fetch assessment status for all children in parallel (only if there are children)
+    if (children.length > 0) {
+      const assessmentPromises = children.map(child =>
+        Api.get(`/api/assessment/${child.id}`)
+          .then(resp => ({ child_id: child.id, assessment: resp.assessment }))
+          .catch(() => ({ child_id: child.id, assessment: null }))
+      );
+      
+      const assessmentResults = await Promise.all(assessmentPromises);
+      assessmentResults.forEach(result => {
+        childAssessments[result.child_id] = result.assessment;
+      });
+      console.log("Fetched assessments for all children");
+    }
   } catch (e) {
-    console.error("Failed to fetch children:", e.message);
-    toast("Could not load children from backend. Using local data.");
-  }
-  
-  // Fetch dashboard summary from backend
-  try {
-    const response = await Api.get("/api/parent/summary");
-    summary = response.summary || summary;
-    console.log("Fetched summary from API:", summary);
-  } catch (e) {
-    console.error("Failed to fetch summary:", e.message);
+    console.error("Failed to fetch data:", e.message);
+    toast("Could not load dashboard. Please refresh the page.");
   }
   
   // Set first child as active if not already set
@@ -48,23 +64,58 @@ Views.guardian = async (el) => {
       <section class="section-card">
         <div class="section-title">👶 Select Learner</div>
         ${children.length === 0 ? `
-          <p>No learner profiles yet. Create one to get started.</p>
-          <form id="createChildForm" style="margin-top:16px">
-            <label for="childName">Learner's name <input id="childName" placeholder="e.g., Emma" required></label>
-            <label for="childAge">Age <input id="childAge" type="number" min="2" max="18" required></label>
-            <label for="childLevel">Learning level 
-              <select id="childLevel" required>
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-              </select>
-            </label>
-            <button type="submit" class="card ok" style="width:100%;min-height:48px">+ Create Profile</button>
-          </form>
+          <p style="color:var(--muted);margin-bottom:20px">No learner profiles yet.</p>
+          <button class="card ok" id="addFirstLearner" style="width:100%;min-height:clamp(48px,6vw,54px);font-size:clamp(0.95rem,2vw,1.05rem)">+ Add Your First Learner</button>
         ` : `
-          <select id="childSelect" style="width:100%;padding:8px;margin-bottom:16px;border-radius:8px;border:1px solid #ccc;font-size:1rem">
-            ${children.map(c => `<option value="${c.id}" ${c.id === window.AUTILEARN_CONTEXT.child_id ? 'selected' : ''}>${c.full_name} (age ${c.age})</option>`).join('')}
-          </select>
+          <div style="display:grid;gap:16px">
+            <!-- Learner Cards Grid -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:0">
+              ${children.map(c => {
+                const hasAssessment = childAssessments[c.id];
+                const isSelected = c.id === window.AUTILEARN_CONTEXT.child_id;
+                const assessmentStatus = hasAssessment ? "✓ Ready" : "📝 Assess";
+                return `
+                  <button class="learner-card" data-child-id="${c.id}" style="
+                    display:flex;
+                    flex-direction:column;
+                    align-items:center;
+                    justify-content:center;
+                    gap:8px;
+                    min-height:150px;
+                    padding:16px 12px;
+                    border:2px solid ${isSelected ? 'var(--blue)' : '#d8e8f8'};
+                    border-radius:18px;
+                    background:${isSelected ? '#e8f4ff' : '#fff'};
+                    color:var(--ink);
+                    font-family:inherit;
+                    cursor:pointer;
+                    transition:all 0.2s ease;
+                    box-shadow:${isSelected ? '0 4px 12px rgba(22,136,237,0.2)' : '0 2px 6px rgba(31,93,155,0.08)'};
+                  ">
+                    <div style="font-size:2.5rem;line-height:1">👶</div>
+                    <div style="font-weight:800;font-size:1rem;text-align:center;color:var(--ink)">${c.full_name}</div>
+                    <div style="font-size:0.85rem;color:#59708f;font-weight:600">${c.age} years old</div>
+                    <div style="font-size:0.75rem;padding:4px 10px;background:${hasAssessment ? '#d4edda' : '#fff3cd'};border-radius:12px;color:${hasAssessment ? '#155724' : '#856404'};font-weight:700">${assessmentStatus}</div>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+            
+            <!-- Action Buttons -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
+              <button class="ghost" id="addNewLearner" style="width:100%;font-size:0.95rem;min-height:48px;font-weight:600">+ Add Learner</button>
+              ${(() => {
+                const selectedChildId = window.AUTILEARN_CONTEXT.child_id;
+                const selectedChild = children.find(c => c.id === selectedChildId);
+                const hasAssessment = childAssessments[selectedChildId];
+                
+                if (!hasAssessment && selectedChild) {
+                  return `<button class="card" data-assess="${selectedChildId}" style="width:100%;background:linear-gradient(135deg,#ff9d25,#ff8a00);color:white;border:none;min-height:48px;font-size:0.95rem;font-weight:700;cursor:pointer;transition:all 0.2s ease;box-shadow:0 4px 12px rgba(255,157,37,0.3)">📝 Assess</button>`;
+                }
+                return `<div></div>`; // Empty spacer if no assessment needed
+              })()}
+            </div>
+          </div>
         `}
       </section>
       
@@ -109,41 +160,168 @@ Views.guardian = async (el) => {
         </div>
         <div class="row">${[10, 25, 50, 100, 200].map(n => `<button class="ghost" data-buy="${n}">＋${n} demo tokens</button>`).join("")}</div><small>Demo balance only. Connect a payment provider through the backend for real purchases.</small></section>
       
-      <section class="section-card"><div class="section-title">🎁 Optional learning extras</div>${SHOP.map(([k, l, c]) => `<div class="row sp"><span>${l}</span>${Store.has(k) ? `<b style="color:#229b59">✓ Unlocked</b>` : `<button class="ghost" data-u="${k}">${c} ⭐</button>`}</div>`).join("")}</section>`;
+      <section class="section-card"><div class="section-title">🎁 Optional learning extras</div>${SHOP.map(([k, l, c]) => `<div class="row sp"><span>${l}</span>${Store.has(k) ? `<b style="color:#229b59">✓ Unlocked</b>` : `<button class="ghost" data-u="${k}">${c} ⭐</button>`}</div>`).join("")}</section>
+      
+      <!-- Add New Learner Modal -->
+      <div id="addLearnerModal" class="modal" style="display:none;z-index:25;position:fixed;inset:0;background:rgba(18,48,89,.45);overflow-y:auto;padding:20px">
+        <form id="addLearnerForm" class="auth" style="max-width:480px;margin:auto;width:100%">
+          <h2 style="text-align:center;margin-top:0;margin-bottom:12px;font-size:1.5rem">Add New Learner</h2>
+          <p style="text-align:center;color:var(--muted);margin:0 0 20px;font-weight:600;font-size:0.95rem">Cost: <strong style="color:var(--orange)">${COST_PER_LEARNER} ⭐ AutiTokens</strong></p>
+          
+          <div class="auth-fields">
+            <label for="newLearnerName" style="font-weight:800;color:#294c7b"><span>Learner's name</span> <span class="required">*</span><input id="newLearnerName" type="text" placeholder="e.g., Emma" required></label>
+            
+            <label for="newLearnerAge" style="font-weight:800;color:#294c7b"><span>Age</span> <span class="required">*</span><input id="newLearnerAge" type="number" min="2" max="18" placeholder="2-18" required></label>
+            
+            <label for="newLearnerLevel" style="font-weight:800;color:#294c7b"><span>Learning level</span> <span class="required">*</span><select id="newLearnerLevel" required>
+              <option value="">Choose level</option>
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+            </select></label>
+          </div>
+          
+          <div id="learnerError" role="alert" style="color:#d64b42;min-height:1.4em;margin:0 0 12px;font-weight:600;font-size:0.95rem"></div>
+          
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <button type="button" id="cancelAddLearner" class="ghost" style="width:100%;min-height:48px;cursor:pointer">Cancel</button>
+            <button type="submit" class="card ok" style="width:100%;min-height:48px;cursor:pointer">Add Learner</button>
+          </div>
+        </form>
+      </div>`;
     
     // Attach event listeners
-    const createForm = el.querySelector("#createChildForm");
-    if (createForm) {
-      createForm.onsubmit = async (e) => {
-        e.preventDefault();
-        try {
-          const response = await Api.post("/api/parent/children", {
-            full_name: el.querySelector("#childName").value,
-            age: parseInt(el.querySelector("#childAge").value),
-            learning_level: el.querySelector("#childLevel").value
-          });
-          console.log("Child created:", response);
-          toast("Child profile created!");
-          go("guardian");  // Refresh
-        } catch (err) {
-          toast("Error: " + err.message);
-        }
-      };
+    const addFirstLearnerBtn = el.querySelector("#addFirstLearner");
+    if (addFirstLearnerBtn) {
+      addFirstLearnerBtn.onclick = () => showAddLearnerModal();
     }
+    
+    const addNewLearnerBtn = el.querySelector("#addNewLearner");
+    if (addNewLearnerBtn) {
+      addNewLearnerBtn.onclick = () => showAddLearnerModal();
+    }
+    
+    // Handle learner card clicks
+    const learnerCards = el.querySelectorAll(".learner-card");
+    learnerCards.forEach(card => {
+      card.onclick = (e) => {
+        e.preventDefault();
+        const childId = parseInt(card.dataset.childId);
+        window.AUTILEARN_CONTEXT.child_id = childId;
+        console.log("Selected child:", childId);
+        draw(); // Redraw to update selection state
+      };
+    });
     
     const childSelect = el.querySelector("#childSelect");
     if (childSelect) {
       childSelect.addEventListener("change", (e) => {
         window.AUTILEARN_CONTEXT.child_id = parseInt(e.target.value);
         console.log("Selected child:", window.AUTILEARN_CONTEXT.child_id);
+        draw();
       });
+    }
+    
+    // Add learner modal event listeners
+    const addLearnerForm = el.querySelector("#addLearnerForm");
+    const cancelBtn = el.querySelector("#cancelAddLearner");
+    const modal = el.querySelector("#addLearnerModal");
+    
+    if (cancelBtn) {
+      cancelBtn.onclick = (e) => {
+        e.preventDefault();
+        modal.style.display = "none";
+      };
+    }
+    
+    if (addLearnerForm) {
+      addLearnerForm.onsubmit = async (e) => {
+        e.preventDefault();
+        
+        const name = el.querySelector("#newLearnerName").value.trim();
+        const age = parseInt(el.querySelector("#newLearnerAge").value);
+        const level = el.querySelector("#newLearnerLevel").value;
+        const errorDiv = el.querySelector("#learnerError");
+        
+        // Validate
+        if (!name) {
+          errorDiv.textContent = "Please enter a learner name.";
+          return;
+        }
+        if (age < 2 || age > 18 || isNaN(age)) {
+          errorDiv.textContent = "Age must be between 2 and 18.";
+          return;
+        }
+        if (!level) {
+          errorDiv.textContent = "Please select a learning level.";
+          return;
+        }
+        
+        // Check tokens
+        const displayTokens = Math.round(s.tokens * 4);
+        if (displayTokens < COST_PER_LEARNER) {
+          errorDiv.textContent = `You need ${COST_PER_LEARNER} ⭐ tokens. You have ${displayTokens}.`;
+          return;
+        }
+        
+        try {
+          // Create learner first (before deducting tokens)
+          const response = await Api.post("/api/parent/children", {
+            full_name: name,
+            age: age,
+            learning_level: level
+          });
+          
+          console.log("Learner created:", response);
+          
+          // Deduct tokens only after successful creation
+          s.tokens -= COST_PER_LEARNER / 4;
+          Store.save();
+          
+          toast("🎉 New learner added!");
+          modal.style.display = "none";
+          
+          // Small delay to ensure database is updated, then refresh
+          setTimeout(() => go("guardian"), 300);
+        } catch (err) {
+          errorDiv.textContent = err.message || "Failed to add learner. Please try again.";
+          console.error("Error adding learner:", err);
+        }
+      };
+    }
+    
+    // Close modal when clicking outside
+    if (modal) {
+      modal.onclick = (e) => {
+        // Only close if clicking on the backdrop (not the form)
+        if (e.target === modal) {
+          modal.style.display = "none";
+        }
+      };
+    }
+  };
+  
+  const showAddLearnerModal = () => {
+    const modal = el.querySelector("#addLearnerModal");
+    if (modal) {
+      modal.style.display = "grid";
+      el.querySelector("#newLearnerName").focus();
+      el.querySelector("#learnerError").textContent = "";
+      el.querySelector("#addLearnerForm").reset();
     }
   };
   
   el.onclick = (e) => {
-    const b = e.target.closest("[data-m],[data-play],[data-mute],[data-buy],[data-d],[data-u],[data-voice]");
+    const b = e.target.closest("[data-m],[data-play],[data-mute],[data-buy],[data-d],[data-u],[data-voice],[data-assess]");
     if (!b || b.disabled) return;
     const d = b.dataset;
+    
+    // Handle assessment button
+    if ("assess" in d) {
+      const childId = parseInt(d.assess);
+      return go("assessment", childId);
+    }
+    
     if ("play" in d) {
       if (s.tokens <= 0) return toast("⚠️ Tokens depleted. Add more tokens to continue.");
       return go("play", lastMod);
