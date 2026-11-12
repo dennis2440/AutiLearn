@@ -20,6 +20,8 @@ p{color:var(--muted)}
 .grid.c4{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:132px;padding:18px;border:2px solid var(--line);border-radius:var(--radius);background:#fff;color:var(--ink);font-family:inherit;font-weight:800;font-size:1.05rem;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
 .card:active{transform:scale(.985)}.card:hover{border-color:#9bcdf8;box-shadow:0 10px 24px rgba(31,93,155,.15)}
+.card:disabled, .card:disabled:hover {opacity:0.5;cursor:not-allowed;border-color:var(--line);background:#f4f9ff}
+.ghost:disabled, .ghost:disabled:hover {opacity:0.5;cursor:not-allowed}
 .tile{font-size:1.15rem;min-height:68px}.big{font-size:3.2rem;line-height:1.1}.soft{opacity:.28;pointer-events:none}
 .ghost{padding:11px 18px;min-height:48px;border:2px solid #a8d5fb;border-radius:16px;background:#fff;color:var(--blue-dark);font:inherit;font-weight:800;cursor:pointer;box-shadow:0 3px 8px rgba(31,93,155,.07)}
 .ok{background:linear-gradient(135deg,#37c96f,#159d55)!important;color:#fff!important;border-color:#159d55!important}
@@ -38,6 +40,10 @@ p{color:var(--muted)}
 .auth label{display:flex;align-items:baseline;gap:6px;font-weight:800;color:#294c7b;flex-wrap:wrap}
 .auth label .required,.auth label .optional{flex-shrink:0}
 .auth label input:not([type=radio]),.auth label select,.auth label textarea{width:100%;flex-basis:100%;margin-top:6px}.auth input:not([type=radio]){padding:14px 15px;font-size:1.05rem;border:2px solid #cfe3f7;border-radius:15px;background:#fbfdff;color:var(--ink)}
+.password-wrapper{display:flex;align-items:center;gap:0;position:relative;width:100%;flex-basis:100%;margin-top:6px}
+.password-wrapper input{flex:1;padding-right:40px}
+.pwd-toggle{position:absolute;right:10px;background:none;border:none;font-size:1.2rem;cursor:pointer;padding:4px 8px;color:#7186a1;transition:color 0.2s}
+.pwd-toggle:hover{color:#176fbe}
 .auth input:focus-visible,.card:focus-visible,.ghost:focus-visible{outline:4px solid #ffd66a;outline-offset:3px}
 .seg{display:flex;gap:8px;border:0;padding:0;margin:0}.seg legend{font-weight:800;margin-bottom:7px}.seg label{flex:1;display:block}.seg input{position:absolute;opacity:0}.seg span{display:block;text-align:center;padding:12px 8px;border:2px solid #d7e7f7;border-radius:14px;background:#f8fbff;cursor:pointer}.seg input:checked+span{border-color:var(--blue);background:#e8f4ff;color:#075eae}.seg input:focus-visible+span{outline:4px solid #ffd66a}
 #err{color:#b34b36;min-height:1.4em;margin:0}
