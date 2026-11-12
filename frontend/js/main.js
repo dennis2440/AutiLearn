@@ -28,7 +28,19 @@ function go(v, arg) {
   }
   app.onclick = null; app.innerHTML = "";
   title.textContent = TITLE[v];
-  const stars = $("#stars"); if (stars) stars.textContent = `⭐ ${Store.s.tokens || 0}`;
+  const stars = $("#stars"); 
+  if (stars) {
+    const avgScore = Store.getAverageScore();
+    const tokenPercent = (Store.s.tokens / Store.s.maxTokens) * 100;
+    const displayTokens = Math.round(Store.s.tokens * 4);  // Convert to display tokens
+    stars.innerHTML = `<div style="display:flex;align-items:center;gap:8px;height:100%">
+      <span>⭐ ${displayTokens}</span>
+      <div style="width:60px;height:6px;background:#ffffff;border-radius:3px;overflow:hidden">
+        <div style="width:${tokenPercent}%;height:100%;background:#ffca3a;transition:width 0.3s ease"></div>
+      </div>
+      <span title="Average Points">🏆 ${avgScore}</span>
+    </div>`;
+  }
   $("#bar").hidden = v === "login" || v === "play";
   Views[v](app, arg);
 }
