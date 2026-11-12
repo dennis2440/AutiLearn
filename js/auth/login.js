@@ -75,10 +75,9 @@ Views.login = (el) => {
       </div>
     </section>
 
-    <label for="u">Username<input id="u" autocomplete="username" autocapitalize="none" placeholder="Choose a username" required minlength="3"></label>
-    <label for="p">Password<input id="p" type="password" autocomplete="current-password" placeholder="Enter your password" required minlength="8"></label>
-    <label id="confirmWrap" for="confirmPassword" hidden>Confirm password
-      <input id="confirmPassword" type="password" autocomplete="new-password" placeholder="Re-enter your password">
+    <label for="u">Username<input id="u" autocomplete="username" autocapitalize="none" placeholder="Enter a username" required minlength="3"></label>
+    <label for="p">Password<div class="password-wrapper"><input id="p" type="password" autocomplete="current-password" placeholder="Enter your password" required minlength="8"><button type="button" class="pwd-toggle" id="toggleP" aria-label="Show/hide password">👁️</button></div></label>
+    <label id="confirmWrap" for="confirmPassword" hidden>Confirm password<div class="password-wrapper"><input id="confirmPassword" type="password" autocomplete="new-password" placeholder="Re-enter your password"><button type="button" class="pwd-toggle" id="toggleConfirm" aria-label="Show/hide password">👁️</button></div></label>
     </label>
     <fieldset class="seg"><legend id="roleLegend">I am signing in as</legend>
       <label><input type="radio" name="role" value="guardian" checked><span>👨‍👩‍👧 Parent / Guardian</span></label>
@@ -100,6 +99,30 @@ Views.login = (el) => {
   const confirmWrap = f.querySelector("#confirmWrap");
   const consentWrap = f.querySelector("#consentWrap");
   const error = f.querySelector("#err");
+
+  // Password visibility toggles
+  const toggleP = f.querySelector("#toggleP");
+  const toggleConfirm = f.querySelector("#toggleConfirm");
+  const pInput = f.querySelector("#p");
+  const confirmInput = f.querySelector("#confirmPassword");
+  
+  if (toggleP) {
+    toggleP.onclick = (e) => {
+      e.preventDefault();
+      const isPassword = pInput.type === "password";
+      pInput.type = isPassword ? "text" : "password";
+      toggleP.textContent = isPassword ? "🙈" : "👁️";
+    };
+  }
+  
+  if (toggleConfirm) {
+    toggleConfirm.onclick = (e) => {
+      e.preventDefault();
+      const isPassword = confirmInput.type === "password";
+      confirmInput.type = isPassword ? "text" : "password";
+      toggleConfirm.textContent = isPassword ? "🙈" : "👁️";
+    };
+  }
 
   const updateForm = () => {
     const registering = mode() === "register";

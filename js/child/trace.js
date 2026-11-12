@@ -9,12 +9,33 @@ const PATHS = {
 };
 const BASIC = ["I","L","T","V","O","1","7"], EXTRA = ["A","H","E","Z","□","△"];
 
-Views.trace = (el) => {
+const TRACE_STAGES = [
+  { name: "✏️ Stage 1: Basic Lines", desc: "Trace simple straight lines", pool: ["I","L","T"] },
+  { name: "🔺 Stage 2: Shapes", desc: "Trace geometric shapes", pool: ["V","O","1"] },
+  { name: "🔤 Stage 3: Letters", desc: "Trace letter shapes", pool: ["A","H","E"] },
+  { name: "🌟 Stage 4: Mixed Challenge", desc: "Trace all kinds of shapes", pool: ["I","L","V","O","A","H"] }
+];
+
+Views.trace = (el, stageNum = 0) => {
   const d = Store.s.difficulty, S = Math.max(220, Math.min(el.clientWidth - 32, innerHeight - 240, 380));
-  const pool = BASIC.concat(Store.has("trace") ? EXTRA : []);
-  el.innerHTML = `<p class="q" id="tq"></p><div class="cv" style="width:${S}px;height:${S}px">
+  const stage = TRACE_STAGES[stageNum];
+  const pool = stage.pool.concat(Store.has("trace") ? EXTRA : []);
+  let stageScore = 0, attempts = 0, correctCount = 0;
+  el.innerHTML = `<div style="text-align:center;margin-bottom:12px;padding:12px;background:#e8f4ff;border-radius:12px">
+    <div style="font-size:0.9rem;color:#294c7b;font-weight:600">${stage.name}</div>
+    <div style="font-size:0.8rem;color:#7186a1;margin-top:4px">${stage.desc}</div>
+    <div style="margin-top:8px;font-weight:800;color:#0869c8">Progress: ${correctCount}/4 correct</div>
+  </div>
+  <p class="q" id="tq"></p><div class="cv" style="width:${S}px;height:${S}px">
     <canvas id="g" width="${S}" height="${S}"></canvas><canvas id="d" width="${S}" height="${S}"></canvas><i class="hand" hidden>👆</i></div>
-    <div class="row"><button class="ghost" id="clr">Clear</button></div>`;
+    <div class="row"><button class="ghost" id="clr">Clear</button></div>
+    <div id="nextStage" style="display:none;text-align:center;margin-top:20px">
+      <p style="font-size:1.2rem;margin:10px 0">🎉 Stage Complete!</p>
+      ${stageNum < TRACE_STAGES.length - 1 ? 
+        `<button class="card ok" id="nextBtn" style="width:100%;min-height:50px">Next Stage →</button>` :
+        `<button class="card ok" id="nextBtn" style="width:100%;min-height:50px">🏆 Activity Complete!</button>`
+      }
+    </div>`;
   const q = (s) => el.querySelector(s), G = q("#g"), D = q("#d"), hand = q(".hand"), gc = G.getContext("2d"), c = D.getContext("2d");
   const W = S * (0.14 - 0.02 * d); // guide width: narrower = stricter on harder levels
   let t = { g: pick(pool), ok: 0 }, mask, pts = [], busy = false, on = false, timer;
@@ -31,6 +52,7 @@ Views.trace = (el) => {
     G.style.opacity = mem ? 0 : 1;
     if (!mem) { const [x, y] = PATHS[t.g][0][0]; c.fillStyle = "#3f8f6b"; c.beginPath(); c.arc(x * S, y * S, W * 0.4, 0, 7); c.fill(); } // start dot
     q("#tq").innerHTML = mem ? `Draw <b>${t.g}</b> from memory 🧠` : `Trace: <b>${t.g}</b>`;
+    q(".cv").parentElement.querySelector("#nextStage").style.display = "none";
   };
 
   const demo = async () => {  // guided correction: a hand traces the shape correctly
@@ -61,11 +83,43 @@ Views.trace = (el) => {
     c.clearRect(0, 0, S, S); G.style.opacity = 1;
     c.fillStyle = "rgba(224,160,48,.45)"; cells.filter(k => !k[2]).forEach(k => c.fillRect(k[0] - 3, k[1] - 3, 6, 6)); // missed parts
     for (let i = 1; i < pts.length; i++) if (!pts[i].b) seg(pts[i - 1], pts[i], inShape(pts[i].x, pts[i].y) ? "#3f8f6b" : "#e0a030"); // green = on path, amber = off
-    Store.record("trace", ok);
+    
+    attempts++;
+    if (ok) {
+      const correctScore = Math.max(0, 100 - (attempts - 1) * 25);
+      stageScore = (stageScore + correctScore) / 2;
+      correctCount++;
+      Store.record("trace", true, correctScore);
+    } else {
+      Store.record("trace", false);
+    }
+
     if (ok) win(); else Fx.bad();
     await sleep(1600); if (!el.isConnected) return;
+    
+    if (Store.s.tokens <= 0) {
+      q("#nextStage").style.display = "block";
+      q("#nextBtn").textContent = "⚠️ Tokens Depleted - Back to Dashboard";
+      toast("Tokens depleted! Return to add more tokens.");
+      q("#nextBtn").onclick = () => go("guardian");
+      return;
+    }
+    
+    if (correctCount >= 4) {
+      q("#nextStage").style.display = "block";
+      return;
+    }
+    
     if (ok) t = t.ok >= 2 ? { g: pick(pool.filter(x => x !== t.g)), ok: 0 } : { g: t.g, ok: t.ok + 1 };
     else { await demo(); if (!el.isConnected) return; if (t.ok >= 2) t.ok = 1; } // progression blocked: same shape again
+    
+    // Update progress counter
+    q(".cv").parentElement.querySelector("#tq").parentElement.parentElement.innerHTML = `<div style="text-align:center;margin-bottom:12px;padding:12px;background:#e8f4ff;border-radius:12px">
+      <div style="font-size:0.9rem;color:#294c7b;font-weight:600">${stage.name}</div>
+      <div style="font-size:0.8rem;color:#7186a1;margin-top:4px">${stage.desc}</div>
+      <div style="margin-top:8px;font-weight:800;color:#0869c8">Progress: ${correctCount}/4 correct</div>
+    </div>`;
+    
     start();
   };
 
@@ -79,5 +133,19 @@ Views.trace = (el) => {
   };
   D.onpointerup = D.onpointercancel = () => { if (on) { on = false; timer = setTimeout(grade, 1000); } };
   q("#clr").onclick = () => { if (!busy) { clearTimeout(timer); start(); } };
+  
+  const nextBtn = q("#nextBtn");
+  if (nextBtn) {
+    nextBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (stageNum < TRACE_STAGES.length - 1) {
+        Views.trace(el, stageNum + 1);
+      } else {
+        go("guardian");
+      }
+    };
+  }
+  
   start();
 };
