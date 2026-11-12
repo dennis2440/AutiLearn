@@ -8,19 +8,19 @@ const MATCH_STAGES = [
 ];
 
 Views.match = (el, stageNum = 0) => {
-  const n = Store.s.difficulty + 1; // 2-4 choices
+  const n = Store.s.difficulty + 1;
   const stage = MATCH_STAGES[stageNum];
-  let correctCount = 0, attempts = 0;
+  let correctCount = 0, skippedCount = 0, attempts = 0;
   
   const round = () => {
     const opts = shuffle(stage.items).slice(0, n), ans = pick(opts);
     el.innerHTML = `<div style="text-align:center;margin-bottom:12px;padding:12px;background:#e8f4ff;border-radius:12px">
       <div style="font-size:0.9rem;color:#294c7b;font-weight:600">${stage.name}</div>
       <div style="font-size:0.8rem;color:#7186a1;margin-top:4px">${stage.desc}</div>
-      <div style="margin-top:8px;font-weight:800;color:#0869c8">Progress: ${correctCount}/4 correct</div>
+      <div style="margin-top:8px;font-weight:800;color:#0869c8">Progress: ${correctCount}/4 correct | ⏭️ ${skippedCount}/4 skipped</div>
     </div>
     <p class="q">Find: <b>${ans[1]}</b></p>
-      <div class="row"><button class="ghost" id="say">🔊 Hear again</button></div>
+      <div class="row"><button class="ghost" id="say">🔊 Hear again</button><button class="ghost" id="skip" style="background:#fff;border-color:#ff9d25;color:#ff9d25;margin-left:auto">⏭️ Skip</button></div>
       <div class="grid">${opts.map(o => `<button class="card" data-k="${o[1]}"><span class="big">${o[0]}</span></button>`).join("")}</div>
       <div id="nextStage" style="display:none;text-align:center;margin-top:20px">
         <p style="font-size:1.2rem;margin:10px 0">🎉 Stage Complete!</p>
@@ -28,7 +28,13 @@ Views.match = (el, stageNum = 0) => {
           `<button class="card ok" id="nextBtn" style="width:100%;min-height:50px">Next Stage →</button>` :
           `<button class="card ok" id="nextBtn" style="width:100%;min-height:50px">🏆 Activity Complete!</button>`
         }
+      </div>
+      <div id="stageFailed" style="display:none;text-align:center;margin-top:20px">
+        <p style="font-size:1.2rem;margin:10px 0;color:#ff6b6b">⚠️ Need More Practice</p>
+        <p style="color:#7186a1;margin-bottom:16px">You need 3 or more correct answers to move to the next stage. Let's try again!</p>
+        <button class="card ok" id="retryBtn" style="width:100%;min-height:50px">Try Again</button>
       </div>`;
+    
     Tts.speak("Find " + ans[1]);
     attempts++;
     
@@ -45,16 +51,41 @@ Views.match = (el, stageNum = 0) => {
       };
     }
     
+    const retryBtn = el.querySelector("#retryBtn");
+    if (retryBtn) {
+      retryBtn.onclick = () => {
+        correctCount = 0;
+        skippedCount = 0;
+        attempts = 0;
+        round();
+      };
+    }
+    
+    const skipBtn = el.querySelector("#skip");
+    if (skipBtn) {
+      skipBtn.onclick = () => {
+        skippedCount++;
+        Store.record("match", false, null, ans[1], true);
+        if (skippedCount >= 2 || (correctCount + skippedCount >= 4 && correctCount < 3)) {
+          el.querySelector("#stageFailed").style.display = "block";
+        } else if (correctCount + skippedCount < 4) {
+          setTimeout(() => {
+            if (el.isConnected) round();
+          }, 500);
+        }
+      };
+    }
+    
     el.onclick = (e) => {
       if (e.target.id === "say") return Tts.speak("Find " + ans[1]);
-      if (e.target.id === "nextBtn") return; // Let the button handler deal with it
+      if (e.target.id === "skip" || e.target.id === "nextBtn") return;
       const b = e.target.closest("[data-k]");
       if (!b || b.classList.contains("soft")) return;
       if (b.dataset.k === ans[1]) {
         el.onclick = null;
         correctCount++;
         const correctScore = Math.max(0, 100 - (attempts - 1) * 25);
-        Store.record("match", true, correctScore);
+        Store.record("match", true, correctScore, ans[1]);
         if (Store.s.tokens <= 0) {
           el.querySelector("#nextStage").style.display = "block";
           el.querySelector("#nextBtn").textContent = "⚠️ Tokens Depleted - Back to Dashboard";
@@ -64,19 +95,22 @@ Views.match = (el, stageNum = 0) => {
         }
         win(b);
         
-        if (correctCount >= 4) {
+        if (correctCount >= 3) {
           setTimeout(() => {
             if (el.isConnected) {
               el.querySelector("#nextStage").style.display = "block";
             }
           }, 1800);
-        } else {
+        } else if (correctCount + skippedCount < 4) {
           setTimeout(() => {
             if (el.isConnected) round();
           }, 1800);
+        } else {
+          el.querySelector("#stageFailed").style.display = "block";
         }
       } else {
-        Store.record("match", false); Fx.bad(b);
+        Store.record("match", false, null, ans[1]);
+        Fx.bad(b);
         setTimeout(() => b.classList.add("soft"), 900);
       }
     };

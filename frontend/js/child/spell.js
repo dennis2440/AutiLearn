@@ -9,7 +9,7 @@ const SPELL_STAGES = [
 
 Views.spell = (el, stageNum = 0) => {
   const stage = SPELL_STAGES[stageNum];
-  let correctCount = 0, attempts = 0;
+  let correctCount = 0, skippedCount = 0, attempts = 0;
   
   const round = () => {
     const [pic, w] = pick(stage.words);
@@ -18,10 +18,10 @@ Views.spell = (el, stageNum = 0) => {
     el.innerHTML = `<div style="text-align:center;margin-bottom:12px;padding:12px;background:#e8f4ff;border-radius:12px">
       <div style="font-size:0.9rem;color:#294c7b;font-weight:600">${stage.name}</div>
       <div style="font-size:0.8rem;color:#7186a1;margin-top:4px">${stage.desc}</div>
-      <div style="margin-top:8px;font-weight:800;color:#0869c8">Progress: ${correctCount}/4 correct</div>
+      <div style="margin-top:8px;font-weight:800;color:#0869c8">Progress: ${correctCount}/4 correct | ⏭️ ${skippedCount}/4 skipped</div>
     </div>
     <div class="big pic">${pic}</div>
-      <div class="row"><button class="ghost" id="say">🔊 Hear word</button></div>
+      <div class="row"><button class="ghost" id="say">🔊 Hear word</button><button class="ghost" id="skip" style="background:#fff;border-color:#ff9d25;color:#ff9d25;margin-left:auto">⏭️ Skip</button></div>
       <div class="slots" aria-live="polite">${[...w].map(() => "<span></span>").join("")}</div>
       <div class="grid c4">${shuffle([...w, ...extra]).map(c => `<button class="card tile" data-c="${c}">${c}</button>`).join("")}</div>
       <div id="nextStage" style="display:none;text-align:center;margin-top:20px">
@@ -30,6 +30,11 @@ Views.spell = (el, stageNum = 0) => {
           `<button class="card ok" id="nextBtn" style="width:100%;min-height:50px">Next Stage →</button>` :
           `<button class="card ok" id="nextBtn" style="width:100%;min-height:50px">🏆 Activity Complete!</button>`
         }
+      </div>
+      <div id="stageFailed" style="display:none;text-align:center;margin-top:20px">
+        <p style="font-size:1.2rem;margin:10px 0;color:#ff6b6b">⚠️ Need More Practice</p>
+        <p style="color:#7186a1;margin-bottom:16px">You need 3 or more correct answers. Let's try again!</p>
+        <button class="card ok" id="retryBtn" style="width:100%;min-height:50px">Try Again</button>
       </div>`;
     const box = el.querySelector(".slots"), slots = box.children;
     const mark = () => [...slots].forEach((s, k) => s.classList.toggle("next", k === i));
@@ -50,9 +55,34 @@ Views.spell = (el, stageNum = 0) => {
       };
     }
     
+    const retryBtn = el.querySelector("#retryBtn");
+    if (retryBtn) {
+      retryBtn.onclick = () => {
+        correctCount = 0;
+        skippedCount = 0;
+        attempts = 0;
+        round();
+      };
+    }
+    
+    const skipBtn = el.querySelector("#skip");
+    if (skipBtn) {
+      skipBtn.onclick = () => {
+        skippedCount++;
+        Store.record("spell", false, null, w, true);
+        if (skippedCount >= 2 || (correctCount + skippedCount >= 4 && correctCount < 3)) {
+          el.querySelector("#stageFailed").style.display = "block";
+        } else if (correctCount + skippedCount < 4) {
+          setTimeout(() => {
+            if (el.isConnected) round();
+          }, 500);
+        }
+      };
+    }
+    
     el.onclick = (e) => {
       if (e.target.id === "say") return Tts.speak(w.toLowerCase());
-      if (e.target.id === "nextBtn") return; // Let the button handler deal with it
+      if (e.target.id === "skip" || e.target.id === "nextBtn") return;
       const b = e.target.closest("[data-c]");
       if (!b || lock || b.classList.contains("soft")) return;
       Tts.speak(b.dataset.c);
@@ -62,7 +92,7 @@ Views.spell = (el, stageNum = 0) => {
           lock = true; box.classList.add("done");
           const correctScore = Math.max(0, 100 - (attempts - 1) * 25);
           correctCount++;
-          Store.record("spell", !miss, correctScore);
+          Store.record("spell", !miss, correctScore, w);
           win();
           if (Store.s.tokens <= 0) {
             setTimeout(() => {
@@ -72,16 +102,18 @@ Views.spell = (el, stageNum = 0) => {
                 toast("Tokens depleted! Return to add more tokens.");
               }
             }, 2200);
-          } else if (correctCount >= 4) {
+          } else if (correctCount >= 3) {
             setTimeout(() => {
               if (el.isConnected) {
                 el.querySelector("#nextStage").style.display = "block";
               }
             }, 2200);
-          } else {
+          } else if (correctCount + skippedCount < 4) {
             setTimeout(() => {
               if (el.isConnected) round();
             }, 2200);
+          } else {
+            el.querySelector("#stageFailed").style.display = "block";
           }
         }
       } else {

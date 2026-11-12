@@ -18,7 +18,7 @@ const Store = (() => {
     save();
     return s.tokens <= 0;
   };
-  const record = (mod, ok, sessionScore = null) => {
+  const record = (mod, ok, sessionScore = null, task = null, skipped = false) => {
     const st = s.stats[mod];
     st[1]++;
     deductTokens();  // Deduct 0.25 tokens for every attempt (correct or incorrect)
@@ -30,7 +30,7 @@ const Store = (() => {
       }
       if ([5, 10, 25].includes(st[0])) s.notes.unshift({ t: Date.now(), msg: `${st[0]} correct in ${mod}` });
     }
-    s.log.unshift({ m: mod, ok, t: Date.now() });
+    s.log.unshift({ m: mod, ok, t: Date.now(), task, skipped });
     s.log.length = Math.min(s.log.length, 200);
     save();
   };
