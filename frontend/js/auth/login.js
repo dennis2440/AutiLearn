@@ -1,27 +1,78 @@
-// Demo authentication. Replace Auth.submit with Flask API calls when backend endpoints are ready.
+// Authentication with real backend API integration
 const Auth = {
-  async hash(s) {
-    if (!window.crypto?.subtle) return "x" + btoa(unescape(encodeURIComponent(s)));
-    const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-    return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
-  },
-  users() { try { return JSON.parse(localStorage.getItem("autilearn_users")) || {}; } catch { return {}; } },
-  session() { try { return JSON.parse(localStorage.getItem("autilearn_session")); } catch { return null; } },
-  logout() { localStorage.removeItem("autilearn_session"); },
-  async submit(mode, u, p, role, profile = {}) {
-    u = u.trim().toLowerCase();
-    const us = Auth.users(), h = await Auth.hash(p);
-    if (mode === "register") {
-      if (us[u]) throw Error("That username is already taken. Please choose another.");
-      us[u] = { h, role, profile, createdAt: new Date().toISOString() };
-      localStorage.setItem("autilearn_users", JSON.stringify(us));
-    } else {
-      const a = us[u];
-      if (!a || a.h !== h) throw Error("Please check your username and password.");
-      if (a.role !== role) throw Error(`This is a ${a.role} account. Please switch the account type.`);
+  token: () => localStorage.getItem("autilearn_token"),
+  setToken: (t) => localStorage.setItem("autilearn_token", t),
+  
+  session() {
+    try {
+      return JSON.parse(localStorage.getItem("autilearn_session"));
+    } catch {
+      return null;
     }
-    localStorage.setItem("autilearn_session", JSON.stringify({ u, role }));
-    return role;
+  },
+  
+  logout() {
+    localStorage.removeItem("autilearn_token");
+    localStorage.removeItem("autilearn_session");
+  },
+  
+  async submit(mode, email, password, role, profile = {}) {
+    email = email.trim().toLowerCase();
+    
+    if (mode === "register") {
+      // REGISTER: POST to backend API
+      const response = await Api.post("/api/auth/register", {
+        full_name: profile.fullName || "",
+        email: email,
+        password: password,
+        role: role
+      });
+      
+      // Store token and session
+      Auth.setToken(response.access_token);
+      localStorage.setItem("autilearn_session", JSON.stringify({
+        user_id: response.user.id,
+        full_name: response.user.full_name,
+        email: response.user.email,
+        role: response.user.role
+      }));
+      
+      // Initialize context
+      if (!window.AUTILEARN_CONTEXT) {
+        window.AUTILEARN_CONTEXT = { user_id: response.user.id, role: response.user.role, child_id: null, activity_start_time: null, duration: 0 };
+      } else {
+        window.AUTILEARN_CONTEXT.user_id = response.user.id;
+        window.AUTILEARN_CONTEXT.role = response.user.role;
+      }
+      
+      return role;
+    } else {
+      // LOGIN: POST to backend API
+      const response = await Api.post("/api/auth/login", {
+        email: email,
+        password: password,
+        role: role
+      });
+      
+      // Store token and session
+      Auth.setToken(response.access_token);
+      localStorage.setItem("autilearn_session", JSON.stringify({
+        user_id: response.user.id,
+        full_name: response.user.full_name,
+        email: response.user.email,
+        role: response.user.role
+      }));
+      
+      // Initialize context
+      if (!window.AUTILEARN_CONTEXT) {
+        window.AUTILEARN_CONTEXT = { user_id: response.user.id, role: response.user.role, child_id: null, activity_start_time: null, duration: 0 };
+      } else {
+        window.AUTILEARN_CONTEXT.user_id = response.user.id;
+        window.AUTILEARN_CONTEXT.role = response.user.role;
+      }
+      
+      return role;
+    }
   },
 };
 
@@ -75,10 +126,9 @@ Views.login = (el) => {
       </div>
     </section>
 
-    <label for="u">Username<input id="u" autocomplete="username" autocapitalize="none" placeholder="Enter a username" required minlength="3"></label>
+    <label for="emailInput">Email address<input id="emailInput" type="email" autocomplete="email" placeholder="Enter your email" required></label>
     <label for="p">Password<div class="password-wrapper"><input id="p" type="password" autocomplete="current-password" placeholder="Enter your password" required minlength="8"><button type="button" class="pwd-toggle" id="toggleP" aria-label="Show/hide password">👁️</button></div></label>
     <label id="confirmWrap" for="confirmPassword" hidden>Confirm password<div class="password-wrapper"><input id="confirmPassword" type="password" autocomplete="new-password" placeholder="Re-enter your password"><button type="button" class="pwd-toggle" id="toggleConfirm" aria-label="Show/hide password">👁️</button></div></label>
-    </label>
     <fieldset class="seg"><legend id="roleLegend">I am signing in as</legend>
       <label><input type="radio" name="role" value="guardian" checked><span>👨‍👩‍👧 Parent / Guardian</span></label>
       <label><input type="radio" name="role" value="tutor"><span>👩‍🏫 Teacher</span></label>
@@ -148,21 +198,28 @@ Views.login = (el) => {
   f.onsubmit = async (e) => {
     e.preventDefault();
     const registering = mode() === "register";
-    const u = f.querySelector("#u").value.trim();
+    const email = f.querySelector("#emailInput").value.trim();
     const p = f.querySelector("#p").value;
-    if (u.length < 3) return (error.textContent = "Please use at least 3 characters for your username.");
-    if (p.length < (registering ? 8 : 6)) return (error.textContent = registering ? "Your password must contain at least 8 characters." : "Please enter your password.");
+    
+    // Validate email
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return (error.textContent = "Please enter a valid email address.");
+    }
+    
+    if (p.length < (registering ? 8 : 6)) {
+      return (error.textContent = registering ? "Your password must contain at least 8 characters." : "Please enter your password.");
+    }
+    
     if (registering) {
       if (!f.reportValidity()) return;
       if (p !== f.querySelector("#confirmPassword").value) return (error.textContent = "Your passwords do not match. Please try again.");
       if (!f.querySelector("#consent").checked) return (error.textContent = "Please agree before creating your account.");
-      const email = f.querySelector("#email").value.trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return (error.textContent = "Please enter a valid email address.");
     }
+    
     const accountRole = role();
     const profile = registering ? {
       fullName: f.querySelector("#fullName").value.trim(),
-      email: f.querySelector("#email").value.trim(),
+      email: email,
       phone: f.querySelector("#phone").value.trim(),
       ...(accountRole === "guardian" ? {
         relationship: f.querySelector("#relationship").value,
@@ -174,7 +231,13 @@ Views.login = (el) => {
         position: f.querySelector("#position").value
       })
     } : {};
-    try { go(await Auth.submit(mode(), u, p, accountRole, profile)); }
-    catch (x) { error.textContent = x.message; }
+    
+    try {
+      const result = await Auth.submit(mode(), email, p, accountRole, profile);
+      go(result);
+    } catch (x) {
+      console.error("Auth error:", x.message);
+      error.textContent = x.message || "An error occurred. Please try again.";
+    }
   };
 };

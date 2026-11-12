@@ -9,14 +9,14 @@ const toast = (m) => {
   const t = $("#toast"); t.textContent = m; t.className = "show";
   clearTimeout(toast.id); toast.id = setTimeout(() => (t.className = ""), 1800);
 };
-const win = (el) => { Fx.good(el); Tts.speak(pick(["Great job!", "Well done!", "Super!", "You did it!"])); }; // visual first, voice optional
+const win = (el) => { Fx.good(el); Tts.speak(pick(["Great job!", "Well done!", "Super!", "You did it!"])); };
 const bars = () => ["match", "spell", "trace"].map(m => {
   const [a, b] = Store.s.stats[m], p = b ? Math.round(100 * a / b) : 0;
   return `<div class="bar"><i style="width:${p}%"></i><span>${m}</span><b>${p}%</b></div>`;
 }).join("");
 
 const TITLE = { login: "AutiLearn", guardian: "Parent / Guardian", tutor: "Teacher Portal", play: "" };
-const ALLOW = { guardian: "guardian", play: "guardian", tutor: "tutor" }; // view -> required role
+const ALLOW = { guardian: "guardian", play: "guardian", tutor: "tutor" };
 
 function go(v, arg) {
   try { speechSynthesis.cancel(); } catch {}
@@ -32,7 +32,7 @@ function go(v, arg) {
   if (stars) {
     const avgScore = Store.getAverageScore();
     const tokenPercent = (Store.s.tokens / Store.s.maxTokens) * 100;
-    const displayTokens = Math.round(Store.s.tokens * 4);  // Convert to display tokens
+    const displayTokens = Math.round(Store.s.tokens * 4);
     stars.innerHTML = `<div style="display:flex;align-items:center;gap:8px;height:100%">
       <span>⭐ ${displayTokens}</span>
       <div style="width:60px;height:6px;background:#ffffff;border-radius:3px;overflow:hidden">
@@ -44,7 +44,39 @@ function go(v, arg) {
   $("#bar").hidden = v === "login" || v === "play";
   Views[v](app, arg);
 }
+
 $("#out").onclick = () => { Auth.logout(); go("login"); };
-Store.save();
+
+// Initialize global context for API integration
 const ses = Auth.session();
+if (ses && ses.user_id) {
+  window.AUTILEARN_CONTEXT = {
+    user_id: ses.user_id,
+    role: ses.role,
+    child_id: null,
+    activity_start_time: null,
+    duration: 0
+  };
+} else {
+  window.AUTILEARN_CONTEXT = {
+    user_id: null,
+    role: null,
+    child_id: null,
+    activity_start_time: null,
+    duration: 0
+  };
+}
+
+// Track activity duration
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    if (window.AUTILEARN_CONTEXT?.activity_start_time) {
+      window.AUTILEARN_CONTEXT.duration += (Date.now() - window.AUTILEARN_CONTEXT.activity_start_time) / 1000;
+    }
+  } else {
+    window.AUTILEARN_CONTEXT.activity_start_time = Date.now();
+  }
+});
+
+Store.save();
 go(ses ? ses.role : "login");
