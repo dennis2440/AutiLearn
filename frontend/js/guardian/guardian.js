@@ -16,7 +16,14 @@ Views.guardian = (el) => {
       </section>
       <section class="section-card"><div class="section-title">⚙️ Learning preferences</div>
         <div class="row sp"><span><b>Sound and voice guidance</b><br><small>Use spoken instructions and feedback</small></span><button class="ghost" data-mute aria-pressed="${!s.mute}">${s.mute ? "🔇 Sound off" : "🔊 Sound on"}</button></div>
-        <h3>Activity difficulty</h3><p>Start with a level that feels comfortable. You can change it at any time.</p>
+        <h3>Voice preference</h3><p>Choose a voice for spoken feedback</p>
+        <div class="row" style="flex-wrap:wrap;gap:8px">${[
+          { id: "default", name: "👨 Male Voice", desc: "Calm male voice" },
+          { id: "female", name: "👩 Female Voice", desc: "Friendly female voice" },
+          { id: "child", name: "👧 Child Voice", desc: "Playful child voice" },
+          { id: "calm", name: "🧘 Calm Voice", desc: "Slow & clear voice" }
+        ].map(v => `<button class="ghost ${s.voice === v.id ? "ok" : ""}" data-voice="${v.id}" title="${v.desc}" style="flex:1;min-width:120px">${v.name}</button>`).join("")}</div>
+        <h3 style="margin-top:16px">Activity difficulty</h3><p>Start with a level that feels comfortable. You can change it at any time.</p>
         <div class="row">${["Easy", "Medium", "Hard"].map((t, i) => `<button class="ghost ${s.difficulty === i + 1 ? "ok" : ""}" data-d="${i + 1}" aria-pressed="${s.difficulty === i + 1}">${t}</button>`).join("")}</div>
       </section>
       <section class="section-card"><div class="section-title">📈 Learning progress</div>${bars()}</section>
@@ -41,15 +48,16 @@ Views.guardian = (el) => {
       <section class="section-card"><div class="section-title">🎁 Optional learning extras</div>${SHOP.map(([k, l, c]) => `<div class="row sp"><span>${l}</span>${Store.has(k) ? `<b style="color:#229b59">✓ Unlocked</b>` : `<button class="ghost" data-u="${k}">${c} ⭐</button>`}</div>`).join("")}</section>`;
   };
   el.onclick = (e) => {
-    const b = e.target.closest("[data-m],[data-play],[data-mute],[data-buy],[data-d],[data-u]");
+    const b = e.target.closest("[data-m],[data-play],[data-mute],[data-buy],[data-d],[data-u],[data-voice]");
     if (!b || b.disabled) return;
     const d = b.dataset;
     if ("play" in d) {
       if (s.tokens <= 0) return toast("⚠️ Tokens depleted. Add more tokens to continue.");
       return go("play", lastMod);
     }
-    if (d.m) { lastMod = d.m; return draw(); }
+    if (d.m) { lastMod = d.m; return go("guardian"); }
     if ("mute" in d) { s.mute = !s.mute; Store.save(); return go("guardian"); }
+    else if ("voice" in d) { s.voice = d.voice; Store.save(); return go("guardian"); }
     else if (d.buy) { 
       s.tokens += +d.buy / 4;  // Convert demo tokens to internal token units (4 tries = 1 token)
       if (s.tokens > s.maxTokens) s.maxTokens = s.tokens;
@@ -57,12 +65,12 @@ Views.guardian = (el) => {
       go("guardian");  // Refresh to update header without full redraw
       return;
     }
-    else if (d.d) { s.difficulty = +d.d; Store.save(); return draw(); }
+    else if (d.d) { s.difficulty = +d.d; Store.save(); return go("guardian"); }
     else if (d.u) {
       const it = SHOP.find(x => x[0] === d.u);
       if (s.tokens < it[2]) return toast("You need more tokens for this extra.");
       s.tokens -= it[2]; s.unlocked.push(d.u);
-      Store.save(); return draw();
+      Store.save(); return go("guardian");
     }
     Store.save(); draw();
   };
